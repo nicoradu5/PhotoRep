@@ -1,0 +1,16 @@
+{
+  "name": "PhotoScope AI",
+  "short_name": "PhotoScope",
+  "description": "Analisi del contesto, composizione e potenziale social delle tue foto.",
+  "start_url": "./photoscope-ai.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0c0c0d",
+  "theme_color": "#0c0c0d",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-180.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}
