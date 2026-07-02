@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>PhotoScope AI</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0c0c0d">
+
+<!-- iOS specifico -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PhotoScope">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" href="icons/icon-192.png">
+<style>
+  :root{
+    --bg:#0c0c0d;
+    --bg-soft:#151517;
+    --panel:#1a1a1d;
+    --line:#2a2a2e;
+    --ink:#f2efe9;
+    --ink-dim:#9a968d;
+    --accent:#ff5a2e;
+    --accent-soft:#ff5a2e22;
+    --ok:#7cd992;
+    --warn:#f2c14e;
+    --serif:"Iowan Old Style","Georgia","Times New Roman",serif;
+    --mono:"IBM Plex Mono","SF Mono","Consolas",monospace;
+    --sans:"Inter","Helvetica Neue",Arial,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(1200px 600px at 80% -10%, #1d1716 0%, transparent 60%),
+      var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    min-height:100vh;
+    padding:48px 20px 100px;
+  }
+  .wrap{max-width:880px;margin:0 auto;}
+
+  header.top{
+    display:flex;align-items:baseline;justify-content:space-between;
+    border-bottom:1px solid var(--line);
+    padding-bottom:22px;margin-bottom:8px;
+  }
+  .brand{display:flex;align-items:baseline;gap:12px;}
+  .brand .mark{font-family:var(--serif);font-style:italic;font-size:30px;letter-spacing:-0.5px;}
+  .brand .mark span{color:var(--accent);font-style:normal;}
+  .tagline{font-family:var(--mono);font-size:11px;color:var(--ink-dim);text-transform:uppercase;letter-spacing:1.5px;}
+  .step-counter{font-family:var(--mono);font-size:11px;color:var(--ink-dim);letter-spacing:1px;}
+
+  .rail{display:flex;gap:6px;margin:22px 0 40px;}
+  .rail i{flex:1;height:2px;background:var(--line);position:relative;overflow:hidden;}
+  .rail i.done{background:var(--accent);}
+  .rail i.active::after{
+    content:"";position:absolute;inset:0;background:var(--accent);
+    animation:pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes pulse{0%,100%{opacity:.35}50%{opacity:1}}
+
+  .stage{display:none;animation:rise .45s ease both;}
+  .stage.active{display:block;}
+  @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+  h1.stage-title{font-family:var(--serif);font-weight:400;font-size:28px;letter-spacing:-.3px;margin:0 0 6px;}
+  p.stage-sub{color:var(--ink-dim);font-size:14.5px;line-height:1.6;margin:0 0 28px;max-width:560px;}
+
+  .dropzone{
+    border:1px dashed var(--line);border-radius:2px;padding:60px 30px;
+    text-align:center;cursor:pointer;transition:border-color .2s, background .2s;position:relative;
+  }
+  .dropzone:hover,.dropzone.drag{border-color:var(--accent);background:var(--accent-soft);}
+  .dropzone .dz-icon{font-size:13px;font-family:var(--mono);color:var(--accent);letter-spacing:2px;text-transform:uppercase;margin-bottom:14px;}
+  .dropzone .dz-main{font-family:var(--serif);font-size:19px;margin-bottom:6px;}
+  .dropzone .dz-sub{font-size:13px;color:var(--ink-dim);}
+  input[type=file]{display:none;}
+
+  .preview-card{border:1px solid var(--line);background:var(--panel);display:flex;gap:0;overflow:hidden;border-radius:2px;}
+  .preview-card img{width:220px;height:220px;object-fit:cover;display:block;flex-shrink:0;}
+  .preview-meta{padding:20px 24px;flex:1;display:flex;flex-direction:column;justify-content:center;}
+  .preview-meta .fname{font-family:var(--mono);font-size:12px;color:var(--ink-dim);margin-bottom:10px;word-break:break-all;}
+  .preview-meta .badge{
+    display:inline-block;font-family:var(--mono);font-size:11px;letter-spacing:1px;text-transform:uppercase;
+    border:1px solid var(--accent);color:var(--accent);padding:5px 10px;border-radius:20px;width:fit-content;
+  }
+
+  .btn{
+    font-family:var(--mono);font-size:12.5px;letter-spacing:.8px;text-transform:uppercase;
+    background:none;border:1px solid var(--ink);color:var(--ink);
+    padding:13px 26px;cursor:pointer;border-radius:2px;transition:all .2s;
+  }
+  .btn:hover{background:var(--ink);color:var(--bg);}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#0c0c0d;font-weight:600;}
+  .btn.primary:hover{background:#ff7048;border-color:#ff7048;color:#0c0c0d;}
+  .btn:disabled{opacity:.35;cursor:not-allowed;pointer-events:none;}
+  .btn-row{display:flex;gap:12px;margin-top:28px;flex-wrap:wrap;}
+
+  .loading-box{display:flex;align-items:center;gap:16px;padding:30px 0;font-family:var(--mono);font-size:13px;color:var(--ink-dim);}
+  .spinner{width:16px;height:16px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--accent);animation:spin .8s linear infinite;flex-shrink:0;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  .ctx-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);margin:24px 0;}
+  .ctx-cell{background:var(--bg-soft);padding:18px 20px;}
+  .ctx-cell .label{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:1.2px;color:var(--ink-dim);margin-bottom:8px;}
+  .ctx-cell .value{font-family:var(--serif);font-size:17px;}
+
+  .q-block{margin-bottom:26px;}
+  .q-num{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:1px;margin-bottom:8px;}
+  .q-text{font-family:var(--serif);font-size:19px;margin-bottom:12px;line-height:1.4;}
+  .q-input{
+    width:100%;background:var(--bg-soft);border:1px solid var(--line);color:var(--ink);
+    font-family:var(--sans);font-size:16px;padding:13px 14px;border-radius:2px;
+    resize:vertical;min-height:50px;-webkit-appearance:none;
+  }
+  .q-input:focus{outline:none;border-color:var(--accent);}
+
+  .score-row{display:flex;gap:1px;background:var(--line);border:1px solid var(--line);margin:24px 0;}
+  .score-cell{flex:1;background:var(--bg-soft);padding:22px 18px;text-align:center;}
+  .score-cell .num{font-family:var(--serif);font-size:36px;line-height:1;}
+  .score-cell .num.ok{color:var(--ok);}
+  .score-cell .num.warn{color:var(--warn);}
+  .score-cell .num.bad{color:var(--accent);}
+  .score-cell .lbl{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--ink-dim);margin-top:8px;}
+
+  .verdict-box{border:1px solid var(--accent);background:var(--accent-soft);padding:22px 24px;margin:24px 0;}
+  .verdict-box .v-tag{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px;}
+  .verdict-box .v-text{font-family:var(--serif);font-size:18px;line-height:1.5;}
+
+  .detail-block{margin:22px 0;}
+  .detail-block h3{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--ink-dim);margin:0 0 10px;border-bottom:1px solid var(--line);padding-bottom:8px;}
+  .detail-block p{font-size:14.5px;line-height:1.65;color:#d8d4cb;margin:0;}
+
+  .sugg-list{display:flex;flex-direction:column;gap:10px;margin:18px 0 0;}
+  .sugg-item{display:flex;align-items:flex-start;gap:14px;border:1px solid var(--line);background:var(--bg-soft);padding:14px 16px;border-radius:2px;}
+  .sugg-item .sugg-num{font-family:var(--mono);color:var(--accent);font-size:13px;flex-shrink:0;width:18px;padding-top:2px;}
+  .sugg-item .sugg-text{flex:1;font-size:14px;}
+  .sugg-item .sugg-why{font-size:12px;color:var(--ink-dim);margin-top:4px;}
+
+  .carousel-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;margin:20px 0;}
+  .carousel-slot{
+    aspect-ratio:1;border:1px dashed var(--line);border-radius:2px;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;overflow:hidden;
+    background:var(--bg-soft);
+  }
+  .carousel-slot:hover{border-color:var(--accent);}
+  .carousel-slot img{width:100%;height:100%;object-fit:cover;}
+  .carousel-slot .plus{font-family:var(--mono);font-size:22px;color:var(--ink-dim);}
+  .carousel-slot .remove{
+    position:absolute;top:4px;right:4px;background:#000c;border:none;color:#fff;
+    width:22px;height:22px;border-radius:50%;font-size:14px;cursor:pointer;line-height:22px;text-align:center;
+  }
+
+  .main-thumb{width:100%;max-width:280px;border:1px solid var(--line);margin-bottom:18px;}
+  .main-thumb img{width:100%;display:block;}
+
+  .order-list{display:flex;flex-direction:column;gap:8px;margin:18px 0;}
+  .order-item{display:flex;align-items:center;gap:14px;border:1px solid var(--line);background:var(--bg-soft);padding:10px 14px;}
+  .order-item .ord-num{font-family:var(--serif);font-size:20px;color:var(--accent);width:24px;flex-shrink:0;}
+  .order-item img{width:54px;height:54px;object-fit:cover;flex-shrink:0;}
+  .order-item .ord-note{font-size:13px;color:#d8d4cb;}
+
+  .caption-box{border:1px solid var(--line);background:var(--bg-soft);padding:22px 24px;margin:24px 0;}
+  .caption-box .cap-tag{font-family:var(--mono);font-size:11px;color:var(--ink-dim);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;}
+  .caption-box .cap-text{font-family:var(--sans);font-size:15px;line-height:1.7;white-space:pre-wrap;color:var(--ink);}
+  .copy-btn{
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.8px;text-transform:uppercase;
+    background:none;border:1px solid var(--line);color:var(--ink-dim);
+    padding:5px 10px;cursor:pointer;border-radius:20px;transition:all .2s;flex-shrink:0;
+  }
+  .copy-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .copy-btn.copied{border-color:var(--ok);color:var(--ok);}
+
+  .footnote{font-family:var(--mono);font-size:11px;color:var(--ink-dim);margin-top:40px;text-align:center;letter-spacing:.4px;}
+  .reset-link{color:var(--ink-dim);text-decoration:underline;cursor:pointer;background:none;border:none;font-family:var(--sans);font-size:13px;padding:0;}
+  .err{color:var(--accent);font-size:13px;font-family:var(--mono);margin-top:14px;line-height:1.5;}
+
+  /* API KEY SCREEN */
+  #apiKeyScreen{
+    position:fixed;inset:0;background:var(--bg);z-index:100;
+    display:flex;align-items:flex-start;justify-content:center;
+    padding:60px 24px 40px;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  }
+  .apikey-box{width:100%;max-width:420px;}
+  .apikey-box .ak-logo{font-family:var(--serif);font-style:italic;font-size:32px;margin-bottom:6px;}
+  .apikey-box .ak-logo span{color:var(--accent);font-style:normal;}
+  .apikey-box .ak-sub{font-size:13.5px;color:var(--ink-dim);line-height:1.6;margin-bottom:28px;}
+  .apikey-box label{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--ink-dim);display:block;margin-bottom:8px;}
+  .apikey-box input{
+    width:100%;background:var(--bg-soft);border:1px solid var(--line);color:var(--ink);
+    font-family:var(--mono);font-size:16px;padding:14px;border-radius:2px;
+    -webkit-appearance:none;appearance:none;
+  }
+  .apikey-box input:focus{outline:none;border-color:var(--accent);}
+  .ak-hint{font-size:13px;color:var(--ink-dim);margin-top:10px;line-height:1.6;}
+  .ak-hint a{color:var(--accent);text-decoration:none;}
+  .ak-steps{margin:16px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px;}
+  .ak-steps li{font-family:var(--mono);font-size:11.5px;color:var(--ink-dim);display:flex;gap:10px;align-items:baseline;}
+  .ak-steps li span{color:var(--accent);flex-shrink:0;}
+  .ak-key-badge{
+    display:flex;align-items:center;gap:8px;margin-top:20px;
+    font-family:var(--mono);font-size:11px;color:var(--ink-dim);
+    border-top:1px solid var(--line);padding-top:16px;
+  }
+  .ak-key-badge::before{content:"🔒";font-size:13px;}
+</style>
+</head>
+<body>
+
+<!-- API KEY SCREEN -->
+<div id="apiKeyScreen">
+  <div class="apikey-box">
+    <div class="ak-logo">Photo<span>Scope</span> AI</div>
+    <p class="ak-sub">Inserisci la tua chiave API Gemini per avviare l'analisi. Resta solo in memoria — non viene mai salvata.</p>
+    <label>API Key Google Gemini</label>
+    <input type="text" id="apiKeyInput" placeholder="AIza…"
+      autocomplete="off" autocorrect="off" autocapitalize="none"
+      spellcheck="false" inputmode="text">
+    <div class="ak-hint">Come ottenerla (gratis):</div>
+    <ul class="ak-steps">
+      <li><span>1.</span> Vai su <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a></li>
+      <li><span>2.</span> Clicca "Create API Key"</li>
+      <li><span>3.</span> Copia e incolla qui sotto</li>
+    </ul>
+    <div class="btn-row" style="margin-top:22px;">
+      <button class="btn primary" id="apiKeyConfirm">Entra →</button>
+    </div>
+    <div id="apiKeyErr" class="err" style="display:none;"></div>
+    <div class="ak-key-badge">La chiave resta solo in memoria — sparisce alla chiusura della scheda.</div>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand">
+      <div class="mark">Photo<span>Scope</span></div>
+    </div>
+    <div class="step-counter" id="stepCounter">FASE 1 / 5</div>
+  </header>
+  <p class="tagline">Analisi del contesto — composizione — potenziale narrativo</p>
+
+  <div class="rail" id="rail">
+    <i class="active" data-i="0"></i>
+    <i data-i="1"></i>
+    <i data-i="2"></i>
+    <i data-i="3"></i>
+    <i data-i="4"></i>
+  </div>
+
+  <!-- STAGE 0: UPLOAD -->
+  <section class="stage active" id="stage0">
+    <h1 class="stage-title">Carica lo scatto principale</h1>
+    <p class="stage-sub">Quello che vuoi pubblicare. Lo analizzeremo per capire il contesto, la composizione e quanto regge da solo.</p>
+    <div class="dropzone" id="dropzone">
+      <div class="dz-icon">— Trascina o seleziona —</div>
+      <div class="dz-main">Carica una fotografia</div>
+      <div class="dz-sub">JPG, PNG · qualsiasi dimensione, compressa automaticamente</div>
+      <input type="file" id="fileInput" accept="image/*">
+    </div>
+    <div id="uploadErr" class="err" style="display:none;"></div>
+  </section>
+
+  <!-- STAGE 1: CONTEXT + QUESTIONS -->
+  <section class="stage" id="stage1">
+    <h1 class="stage-title">Contesto rilevato</h1>
+    <p class="stage-sub">Prima di procedere, alcune domande mirate per evitare interpretazioni errate.</p>
+    <div class="preview-card" id="previewCard"></div>
+    <div id="ctxLoading" class="loading-box">
+      <div class="spinner"></div> Lettura del contesto visivo in corso…
+    </div>
+    <div id="ctxResult" style="display:none;">
+      <div class="ctx-grid" id="ctxGrid"></div>
+      <div id="questionsArea"></div>
+      <div class="btn-row">
+        <button class="btn primary" id="submitAnswers">Continua all'analisi tecnica →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STAGE 2: TECHNICAL ANALYSIS -->
+  <section class="stage" id="stage2">
+    <h1 class="stage-title">Analisi tecnica</h1>
+    <p class="stage-sub">Composizione, colore e potenziale dello scatto, in base al contesto raccolto.</p>
+    <div id="techLoading" class="loading-box">
+      <div class="spinner"></div> Valutazione di composizione, colore e impatto…
+    </div>
+    <div id="techResult" style="display:none;"></div>
+  </section>
+
+  <!-- STAGE 3: CAROUSEL -->
+  <section class="stage" id="stage3">
+    <h1 class="stage-title">Costruiamo il carosello</h1>
+    <p class="stage-sub">Lo scatto principale rende meglio accompagnato da altre immagini. Carica gli scatti suggeriti (o altri a tua scelta).</p>
+    <div class="main-thumb" id="mainThumbBox"></div>
+    <div id="suggestionsBox"></div>
+    <h3 style="font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--ink-dim);margin:30px 0 4px;">Carica le foto di supporto</h3>
+    <div class="carousel-grid" id="carouselGrid"></div>
+    <input type="file" id="carouselInput" accept="image/*" multiple style="display:none;">
+    <div class="btn-row">
+      <button class="btn" id="skipCarousel">Salta, pubblico da sola</button>
+      <button class="btn primary" id="analyzeCarousel" disabled>Analizza il carosello →</button>
+    </div>
+  </section>
+
+  <!-- STAGE 4: FINAL REPORT -->
+  <section class="stage" id="stage4">
+    <h1 class="stage-title">Report finale</h1>
+    <p class="stage-sub" id="finalSub">Ecco la valutazione completa.</p>
+    <div id="finalLoading" class="loading-box" style="display:none;">
+      <div class="spinner"></div> Composizione del report d'insieme…
+    </div>
+    <div id="finalResult"></div>
+    <div class="btn-row">
+      <button class="reset-link" id="resetBtn">↺ Inizia una nuova analisi</button>
+    </div>
+  </section>
+
+  <div class="footnote">PHOTOSCOPE AI · POWERED BY GEMINI 2.5 FLASH · I GIUDIZI SONO ORIENTATIVI</div>
+</div>
+
+<script>
+/* ── API KEY GATE ── */
+let API_KEY = '';
+const GEMINI_MODEL = 'gemini-2.5-flash';
+
+const apiKeyScreen  = document.getElementById('apiKeyScreen');
+const apiKeyInput   = document.getElementById('apiKeyInput');
+const apiKeyConfirm = document.getElementById('apiKeyConfirm');
+const apiKeyErr     = document.getElementById('apiKeyErr');
+
+apiKeyConfirm.addEventListener('click', validateKey);
+apiKeyInput.addEventListener('keydown', e => { if(e.key==='Enter') validateKey(); });
+
+function validateKey(){
+  const val = apiKeyInput.value.trim();
+  if(val.length < 15){
+    apiKeyErr.textContent = 'La chiave sembra troppo corta. Ricontrollala.';
+    apiKeyErr.style.display = 'block';
+    return;
+  }
+  API_KEY = val;
+  apiKeyScreen.style.display = 'none';
+}
+
+/* ── STATE ── */
+const state = {
+  mainImage: null,
+  category: null,
+  questions: [],
+  answers: [],
+  techAnalysis: null,
+  needsCarousel: false,
+  suggestions: [],
+  carouselImages: [],
+  carouselAnalysis: null
+};
+
+/* ── HELPERS ── */
+function setStage(n){
+  document.querySelectorAll('.stage').forEach(s=>s.classList.remove('active'));
+  document.getElementById('stage'+n).classList.add('active');
+  document.querySelectorAll('#rail i').forEach((el,i)=>{
+    el.classList.remove('active','done');
+    if(i<n) el.classList.add('done');
+    if(i===n) el.classList.add('active');
+  });
+  document.getElementById('stepCounter').textContent = `FASE ${n+1} / 5`;
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function fileToDataUrl(file){
+  return new Promise((res,rej)=>{
+    const r = new FileReader();
+    r.onload = ()=>res(r.result);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+
+function compressImage(dataUrl, maxPx=1600, quality=0.88){
+  return new Promise(resolve=>{
+    const img = new window.Image();
+    img.onload = ()=>{
+      let {width:w, height:h} = img;
+      if(w>maxPx || h>maxPx){
+        if(w>h){ h=Math.round(h*maxPx/w); w=maxPx; }
+        else   { w=Math.round(w*maxPx/h); h=maxPx; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width=w; canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.src = dataUrl;
+  });
+}
+
+/* ── GEMINI API ── */
+async function callGemini(parts, systemPrompt, jsonMode=true){
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${API_KEY}`;
+  const body = {
+    system_instruction: { parts: [{ text: systemPrompt }] },
+    contents: [{ role:'user', parts }],
+    generationConfig: {
+      maxOutputTokens: 2000,
+      temperature: 0.3,
+      // Disabilita il thinking mode — necessario per ottenere JSON pulito
+      thinkingConfig: { thinkingBudget: 0 }
+    }
+  };
+
+  const res = await fetch(url, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  });
+
+  if(!res.ok){
+    let msg = `Errore API Gemini: ${res.status}`;
+    try{
+      const d = await res.json();
+      if(d.error?.message) msg = d.error.message;
+    }catch(e){}
+    throw new Error(msg);
+  }
+
+  const data = await res.json();
+
+  if(data.promptFeedback?.blockReason){
+    throw new Error('Contenuto bloccato da Gemini: '+data.promptFeedback.blockReason);
+  }
+
+  // Filtra i "thought" parts (token di ragionamento interno di Gemini 2.5)
+  // e prendi solo il testo reale della risposta
+  const text = (data.candidates?.[0]?.content?.parts || [])
+    .filter(p => !p.thought)   // scarta i blocchi di pensiero
+    .map(p => p.text || '')
+    .join('');
+
+  if(!jsonMode) return text;
+
+  const parsed = extractJson(text);
+  if(parsed) return parsed;
+
+  // Debug: mostra i primi 300 char della risposta grezza per diagnosticare
+  const preview = text.slice(0, 300).replace(/\n/g, ' ');
+  throw new Error(`Risposta AI non interpretabile. Anteprima: "${preview}"`);
+}
+
+function extractJson(raw){
+  if(!raw || !raw.trim()) return null;
+
+  // 1. Rimuovi blocchi markdown ```json ... ``` o ``` ... ```
+  let clean = raw.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+
+  // 2. Parse diretto
+  try { return JSON.parse(clean); } catch(e){}
+
+  // 3. Estrai tra primo { e ultimo }
+  const start = clean.indexOf('{');
+  const end   = clean.lastIndexOf('}');
+  if(start !== -1 && end > start){
+    try { return JSON.parse(clean.slice(start, end + 1)); } catch(e){}
+  }
+
+  // 4. Fallback sul testo grezzo originale
+  const s2 = raw.indexOf('{');
+  const e2 = raw.lastIndexOf('}');
+  if(s2 !== -1 && e2 > s2){
+    try { return JSON.parse(raw.slice(s2, e2 + 1)); } catch(e){}
+  }
+
+  return null;
+}
+
+function imagePart(dataUrl){
+  return {
+    inline_data:{
+      mime_type: 'image/jpeg',
+      data: dataUrl.split(',')[1]
+    }
+  };
+}
+
+function textPart(t){ return { text: t }; }
+
+/* ── STAGE 0: UPLOAD ── */
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+
+dropzone.addEventListener('click', ()=>fileInput.click());
+dropzone.addEventListener('dragover', e=>{e.preventDefault();dropzone.classList.add('drag');});
+dropzone.addEventListener('dragleave', ()=>dropzone.classList.remove('drag'));
+dropzone.addEventListener('drop', e=>{
+  e.preventDefault(); dropzone.classList.remove('drag');
+  if(e.dataTransfer.files[0]) handleMainFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e=>{
+  if(e.target.files[0]) handleMainFile(e.target.files[0]);
+});
+
+async function handleMainFile(file){
+  const errBox = document.getElementById('uploadErr');
+  errBox.style.display='none';
+  if(!file.type.startsWith('image/')){
+    errBox.textContent='Carica un file immagine valido.';
+    errBox.style.display='block';
+    return;
+  }
+  dropzone.innerHTML=`<div class="dz-icon">— elaborazione —</div><div class="dz-main">Compressione in corso…</div><div class="dz-sub">Le foto da camera vengono ottimizzate per l'analisi</div>`;
+  try{
+    const raw = await fileToDataUrl(file);
+    const compressed = await compressImage(raw, 1600, 0.88);
+    const sizeKB = Math.round(compressed.length*0.75/1024);
+    state.mainImage = { dataUrl:compressed, name:file.name };
+
+    document.getElementById('previewCard').innerHTML = `
+      <img src="${compressed}">
+      <div class="preview-meta">
+        <div class="fname">${esc(file.name)}</div>
+        <div class="fname" style="font-size:10px;margin-top:2px;opacity:.6">ottimizzata · ~${sizeKB} KB</div>
+        <div class="badge" id="catBadge">Analisi in corso…</div>
+      </div>`;
+
+    setStage(1);
+    await analyzeContext();
+  }catch(e){
+    errBox.textContent='Errore nel caricamento: '+e.message;
+    errBox.style.display='block';
+    dropzone.innerHTML=`<div class="dz-icon">— Trascina o seleziona —</div><div class="dz-main">Carica una fotografia</div><div class="dz-sub">JPG, PNG · qualsiasi dimensione</div><input type="file" id="fileInput" accept="image/*">`;
+    document.getElementById('fileInput').addEventListener('change', e=>{ if(e.target.files[0]) handleMainFile(e.target.files[0]); });
+  }
+}
+
+/* ── STAGE 1: CONTEXT ANALYSIS ── */
+async function analyzeContext(){
+  document.getElementById('ctxLoading').style.display='flex';
+  document.getElementById('ctxResult').style.display='none';
+
+  const sys = `Sei un fotografo esperto e social media strategist. Analizzi una foto e rispondi SOLO con un oggetto JSON valido, nient'altro, senza markdown, senza backtick.
+Struttura:
+{
+  "categoria": "una tra: wildlife, sport, lifestyle, street photography, ritratto, paesaggio, food, architettura, evento, altro",
+  "soggetto_principale": "breve descrizione del soggetto principale, o 'non chiaro'",
+  "ambientazione": "breve descrizione del contesto/ambiente",
+  "chiarezza_contesto": "alta / media / bassa",
+  "domande": [
+    {"testo":"prima domanda mirata e specifica per questa foto"},
+    {"testo":"seconda domanda mirata"},
+    {"testo":"terza domanda mirata"}
+  ]
+}
+Le domande devono essere concrete e specifiche all'immagine. Scrivi in italiano.`;
+
+  try{
+    const result = await callGemini(
+      [imagePart(state.mainImage.dataUrl), textPart('Analizza questa fotografia.')],
+      sys
+    );
+    state.category = result.categoria;
+    state.questions = result.domande.map(d=>d.testo);
+
+    document.getElementById('catBadge').textContent = result.categoria;
+    document.getElementById('ctxGrid').innerHTML = `
+      <div class="ctx-cell"><div class="label">Categoria</div><div class="value">${esc(result.categoria)}</div></div>
+      <div class="ctx-cell"><div class="label">Chiarezza contesto</div><div class="value">${esc(result.chiarezza_contesto)}</div></div>
+      <div class="ctx-cell"><div class="label">Soggetto rilevato</div><div class="value">${esc(result.soggetto_principale)}</div></div>
+      <div class="ctx-cell"><div class="label">Ambientazione</div><div class="value">${esc(result.ambientazione)}</div></div>
+    `;
+
+    document.getElementById('questionsArea').innerHTML = state.questions.map((q,i)=>`
+      <div class="q-block">
+        <div class="q-num">DOMANDA ${i+1} DI 3</div>
+        <div class="q-text">${esc(q)}</div>
+        <textarea class="q-input" data-i="${i}" placeholder="La tua risposta…"></textarea>
+      </div>
+    `).join('');
+
+    document.getElementById('ctxLoading').style.display='none';
+    document.getElementById('ctxResult').style.display='block';
+  }catch(err){
+    document.getElementById('ctxLoading').innerHTML=`<span class="err">Errore: ${err.message}</span>`;
+  }
+}
+
+document.getElementById('submitAnswers').addEventListener('click', async ()=>{
+  const inputs = document.querySelectorAll('.q-input');
+  state.answers = Array.from(inputs).map(i=>i.value.trim()||'(nessuna risposta)');
+  setStage(2);
+  await runTechnicalAnalysis();
+});
+
+/* ── STAGE 2: TECHNICAL ANALYSIS ── */
+async function runTechnicalAnalysis(){
+  document.getElementById('techLoading').style.display='flex';
+  document.getElementById('techResult').style.display='none';
+
+  const qaText = state.questions.map((q,i)=>`D: ${q}\nR: ${state.answers[i]}`).join('\n\n');
+
+  const sys = `Sei un photo editor e social strategist esperto. Categoria foto: ${state.category}. Fai un'analisi tecnica e rispondi SOLO con JSON valido, senza markdown, senza backtick.
+{
+  "punteggio_composizione": numero 0-100,
+  "punteggio_colore": numero 0-100,
+  "punteggio_impatto": numero 0-100,
+  "composizione_note": "analisi regola dei terzi, posizionamento soggetto, bilanciamento (3-4 frasi)",
+  "colore_note": "analisi imperfezioni cromatiche, bilanciamento, dominanti indesiderate (3-4 frasi)",
+  "regge_da_sola": true oppure false,
+  "verdetto": "frase breve e diretta",
+  "reach_stimato": "basso / medio / alto",
+  "reach_motivazione": "2-3 frasi",
+  "caption_instagram": "caption pronta per Instagram in italiano: tono attuale e diretto, niente frasi da boomer, niente cliché, niente abuso di emoji. 1-3 righe brevi che catturano l'essenza, poi a capo 4-6 hashtag specifici e pertinenti (non generici)",
+  "suggerimenti_carosello": [
+    {"foto": "descrizione breve della foto da aggiungere", "perche": "perché supporta la foto principale"}
+  ]
+}
+suggerimenti_carosello: compila solo se regge_da_sola è false, altrimenti array vuoto. Scrivi in italiano.`;
+
+  try{
+    const result = await callGemini(
+      [imagePart(state.mainImage.dataUrl),
+       textPart(`Contesto raccolto:\n${qaText}\n\nProcedi con l'analisi tecnica completa.`)],
+      sys
+    );
+    state.techAnalysis = result;
+    state.needsCarousel = !result.regge_da_sola;
+    state.suggestions = result.suggerimenti_carosello || [];
+    renderTechResult(result);
+    document.getElementById('techLoading').style.display='none';
+    document.getElementById('techResult').style.display='block';
+  }catch(err){
+    document.getElementById('techLoading').innerHTML=`<span class="err">Errore nell'analisi: ${err.message}</span>`;
+  }
+}
+
+function scoreClass(n){ return n>=70?'ok':(n>=45?'warn':'bad'); }
+
+function renderTechResult(r){
+  document.getElementById('techResult').innerHTML = `
+    <div class="score-row">
+      <div class="score-cell"><div class="num ${scoreClass(r.punteggio_composizione)}">${r.punteggio_composizione}</div><div class="lbl">Composizione</div></div>
+      <div class="score-cell"><div class="num ${scoreClass(r.punteggio_colore)}">${r.punteggio_colore}</div><div class="lbl">Colore</div></div>
+      <div class="score-cell"><div class="num ${scoreClass(r.punteggio_impatto)}">${r.punteggio_impatto}</div><div class="lbl">Impatto</div></div>
+    </div>
+    <div class="verdict-box">
+      <div class="v-tag">${r.regge_da_sola?'Regge da sola':'Meglio in carosello'}</div>
+      <div class="v-text">${esc(r.verdetto)}</div>
+    </div>
+    <div class="detail-block"><h3>Composizione</h3><p>${esc(r.composizione_note)}</p></div>
+    <div class="detail-block"><h3>Colore</h3><p>${esc(r.colore_note)}</p></div>
+    <div class="detail-block"><h3>Reach stimato — ${esc(r.reach_stimato)}</h3><p>${esc(r.reach_motivazione)}</p></div>
+  `;
+
+  const btnRow = document.createElement('div');
+  btnRow.className='btn-row';
+  btnRow.innerHTML = r.regge_da_sola
+    ? `<button class="btn primary" id="goFinalSolo">Vai al report finale →</button>`
+    : `<button class="btn primary" id="goCarousel">Costruisci il carosello →</button>`;
+  document.getElementById('techResult').appendChild(btnRow);
+
+  if(r.regge_da_sola){
+    document.getElementById('goFinalSolo').addEventListener('click',()=>{setStage(4);renderFinalSolo();});
+  } else {
+    document.getElementById('goCarousel').addEventListener('click',()=>{setStage(3);renderCarouselStage();});
+  }
+}
+
+/* ── STAGE 3: CAROUSEL ── */
+function renderCarouselStage(){
+  document.getElementById('mainThumbBox').innerHTML=`<img src="${state.mainImage.dataUrl}">`;
+  document.getElementById('suggestionsBox').innerHTML=
+    `<h3 style="font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--ink-dim);margin:0 0 4px;">Scatti suggeriti</h3>
+    <div class="sugg-list">`+
+    state.suggestions.map((s,i)=>`
+      <div class="sugg-item">
+        <div class="sugg-num">${i+1}</div>
+        <div>
+          <div class="sugg-text">${esc(s.foto)}</div>
+          <div class="sugg-why">${esc(s.perche)}</div>
+        </div>
+      </div>`).join('')+
+    `</div>`;
+  renderCarouselGrid();
+}
+
+function renderCarouselGrid(){
+  const grid=document.getElementById('carouselGrid');
+  grid.innerHTML='';
+  state.carouselImages.forEach((img,i)=>{
+    const slot=document.createElement('div');
+    slot.className='carousel-slot';
+    slot.innerHTML=`<img src="${img.dataUrl}"><button class="remove" data-i="${i}">×</button>`;
+    grid.appendChild(slot);
+  });
+  const add=document.createElement('div');
+  add.className='carousel-slot';
+  add.innerHTML=`<div class="plus">+</div>`;
+  add.addEventListener('click',()=>document.getElementById('carouselInput').click());
+  grid.appendChild(add);
+  grid.querySelectorAll('.remove').forEach(btn=>{
+    btn.addEventListener('click',e=>{
+      e.stopPropagation();
+      state.carouselImages.splice(parseInt(btn.dataset.i),1);
+      renderCarouselGrid(); toggleAnalyzeBtn();
+    });
+  });
+}
+
+document.getElementById('carouselInput').addEventListener('change', async e=>{
+  for(const file of e.target.files){
+    if(file.type.startsWith('image/')){
+      const raw=await fileToDataUrl(file);
+      const dataUrl=await compressImage(raw,1600,0.88);
+      state.carouselImages.push({dataUrl});
+    }
+  }
+  renderCarouselGrid(); toggleAnalyzeBtn();
+  e.target.value='';
+});
+
+function toggleAnalyzeBtn(){
+  document.getElementById('analyzeCarousel').disabled=state.carouselImages.length===0;
+}
+
+document.getElementById('skipCarousel').addEventListener('click',()=>{setStage(4);renderFinalSolo(true);});
+document.getElementById('analyzeCarousel').addEventListener('click',async()=>{setStage(4);await runCarouselAnalysis();});
+
+/* ── STAGE 4: FINAL REPORT ── */
+function renderFinalSolo(skipped){
+  const r=state.techAnalysis;
+  document.getElementById('finalSub').textContent=skipped
+    ?'Hai scelto di pubblicare lo scatto da solo.'
+    :'Lo scatto regge bene da solo. Ecco il riepilogo.';
+  document.getElementById('finalResult').innerHTML=`
+    <div class="main-thumb"><img src="${state.mainImage.dataUrl}"></div>
+    <div class="score-row">
+      <div class="score-cell"><div class="num ${scoreClass(r.punteggio_composizione)}">${r.punteggio_composizione}</div><div class="lbl">Composizione</div></div>
+      <div class="score-cell"><div class="num ${scoreClass(r.punteggio_colore)}">${r.punteggio_colore}</div><div class="lbl">Colore</div></div>
+      <div class="score-cell"><div class="num ${scoreClass(r.punteggio_impatto)}">${r.punteggio_impatto}</div><div class="lbl">Impatto</div></div>
+    </div>
+    <div class="verdict-box">
+      <div class="v-tag">Formato: Post singolo</div>
+      <div class="v-text">${esc(r.verdetto)}</div>
+    </div>
+    <div class="detail-block"><h3>Reach stimato — ${esc(r.reach_stimato)}</h3><p>${esc(r.reach_motivazione)}</p></div>
+    ${captionBoxHtml(r.caption_instagram,'caption-solo')}
+  `;
+  attachCopyHandler('caption-solo', r.caption_instagram);
+}
+
+async function runCarouselAnalysis(){
+  document.getElementById('finalSub').textContent="Analisi d'insieme del carosello.";
+  document.getElementById('finalLoading').style.display='flex';
+  document.getElementById('finalResult').innerHTML='';
+
+  const sys=`Sei un photo editor e social strategist. Hai foto che formano un carosello. Analizza l'insieme come narrazione coesa. Rispondi SOLO con JSON valido, senza markdown, senza backtick.
+{
+  "punteggio_coerenza_colore": numero 0-100,
+  "punteggio_narrazione": numero 0-100,
+  "punteggio_impatto_insieme": numero 0-100,
+  "coerenza_colore_note": "analisi armonia cromatica (3-4 frasi)",
+  "narrazione_note": "analisi logica di sequenza e storytelling (3-4 frasi)",
+  "ordine_consigliato": [array di indici: 0=principale, 1,2,3...=supporto in ordine caricamento],
+  "motivazione_ordine": "perché questo ordine racconta meglio la storia",
+  "reach_stimato": "basso / medio / alto",
+  "reach_motivazione": "2-3 frasi",
+  "caption_instagram": "caption per il carosello completo, italiano, tono attuale e diretto, 1-3 righe + a capo 4-6 hashtag specifici"
+}
+Scrivi in italiano.`;
+
+  const parts=[imagePart(state.mainImage.dataUrl)];
+  state.carouselImages.forEach(img=>parts.push(imagePart(img.dataUrl)));
+  parts.push(textPart('Prima immagine = principale. Le successive = supporto, nell\'ordine fornito. Analizza come carosello.'));
+
+  try{
+    const result=await callGemini(parts,sys);
+    state.carouselAnalysis=result;
+    renderFinalCarousel(result);
+  }catch(err){
+    document.getElementById('finalResult').innerHTML=`<span class="err">Errore: ${err.message}</span>`;
+  }
+  document.getElementById('finalLoading').style.display='none';
+}
+
+function renderFinalCarousel(r){
+  const all=[state.mainImage,...state.carouselImages];
+  const order=(r.ordine_consigliato?.length===all.length)?r.ordine_consigliato:all.map((_,i)=>i);
+  document.getElementById('finalResult').innerHTML=`
+    <div class="score-row">
+      <div class="score-cell"><div class="num ${scoreClass(r.punteggio_coerenza_colore)}">${r.punteggio_coerenza_colore}</div><div class="lbl">Coerenza colore</div></div>
+      <div class="score-cell"><div class="num ${scoreClass(r.punteggio_narrazione)}">${r.punteggio_narrazione}</div><div class="lbl">Narrazione</div></div>
+      <div class="score-cell"><div class="num ${scoreClass(r.punteggio_impatto_insieme)}">${r.punteggio_impatto_insieme}</div><div class="lbl">Impatto insieme</div></div>
+    </div>
+    <div class="verdict-box">
+      <div class="v-tag">Formato: Carosello</div>
+      <div class="v-text">${esc(r.motivazione_ordine)}</div>
+    </div>
+    <div class="detail-block">
+      <h3>Ordine consigliato</h3>
+      <div class="order-list">
+        ${order.map((idx,pos)=>`
+          <div class="order-item">
+            <div class="ord-num">${pos+1}</div>
+            <img src="${all[idx].dataUrl}">
+            <div class="ord-note">${idx===0?'Foto principale':'Foto di supporto #'+idx}</div>
+          </div>`).join('')}
+      </div>
+    </div>
+    <div class="detail-block"><h3>Coerenza cromatica</h3><p>${esc(r.coerenza_colore_note)}</p></div>
+    <div class="detail-block"><h3>Narrazione</h3><p>${esc(r.narrazione_note)}</p></div>
+    <div class="detail-block"><h3>Reach stimato — ${esc(r.reach_stimato)}</h3><p>${esc(r.reach_motivazione)}</p></div>
+    ${captionBoxHtml(r.caption_instagram,'caption-carousel')}
+  `;
+  attachCopyHandler('caption-carousel', r.caption_instagram);
+}
+
+function captionBoxHtml(caption,id){
+  return `
+    <div class="caption-box">
+      <div class="cap-tag">
+        <span>Caption suggerita</span>
+        <button class="copy-btn" id="copy-${id}">Copia</button>
+      </div>
+      <div class="cap-text">${esc(caption||'')}</div>
+    </div>`;
+}
+
+function attachCopyHandler(id,text){
+  const btn=document.getElementById('copy-'+id);
+  if(!btn||!text) return;
+  btn.addEventListener('click',async()=>{
+    try{
+      await navigator.clipboard.writeText(text);
+      btn.textContent='Copiata ✓'; btn.classList.add('copied');
+      setTimeout(()=>{btn.textContent='Copia';btn.classList.remove('copied');},1800);
+    }catch(e){ btn.textContent='Errore'; }
+  });
+}
+
+/* ── RESET ── */
+document.getElementById('resetBtn').addEventListener('click',()=>location.reload());
+
+/* ── PWA ── */
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+}
+
+/* ── UTIL ── */
+function esc(s){
+  if(typeof s!=='string') return s??'';
+  return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+</script>
+</body>
+</html>
